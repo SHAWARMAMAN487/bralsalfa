@@ -89,11 +89,12 @@ function lview(){
  return S.hostId;}
 
 /* ---------- online (PeerJS, no server needed) ---------- */
+const PC={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]}};
 const gen=()=>Array.from({length:5},()=>pick([...'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'])).join('');
 function reset(){try{peer&&peer.destroy()}catch(e){}peer=null;gconn=null;conns={};S=null;V=null;mode=null;host=false;scr='home';render();}
 function create(){
  name=$('#nm').value.trim()||'المضيف';code=gen();mode='online';host=true;
- peer=new Peer('bara-salfa-'+code);
+ peer=new Peer('bara-salfa-'+code,PC);
  peer.on('open',()=>{meId='host';S={hostId:'host',players:[{id:'host',name}],cat:'أكلات',phase:'lobby',round:0};scr='game';render();});
  peer.on('connection',c=>{conns[c.peer]=c;
   c.on('data',m=>handle(m,c.peer));
@@ -103,7 +104,7 @@ function create(){
 function join(){
  name=$('#nm').value.trim();code=$('#cd').value.trim().toUpperCase();
  if(!name||code.length<4){err='اكتب اسمك وكود الغرفة';render();return;}
- mode='online';host=false;peer=new Peer();
+ mode='online';host=false;peer=new Peer(undefined,PC);
  const fail=m=>{if(!V){err=m;reset();}};
  peer.on('open',id=>{meId=id;gconn=peer.connect('bara-salfa-'+code,{reliable:true});
   gconn.on('open',()=>gconn.send({t:'join',name}));
