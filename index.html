@@ -58,22 +58,24 @@ let scr='home',mode=null,host=false,meId=null,peer=null,gconn=null,conns={},S=nu
 /* ---------- game logic (runs on the host / single phone) ---------- */
 function pub(id){const s={...S};if(s.phase!=='result')delete s.word;if(!['result','guess'].includes(s.phase))delete s.out;
  return{S:s,card:s.phase==='lobby'?null:(S.out===id?{out:1}:{word:S.word})};}
-function start(){S.word=pick(CATS[S.cat]);S.out=pick(S.players).id;S.order=shuf(S.players.map(p=>p.id));S.phase='card';S.seen={};S.votes={};S.win=null;S.guessed=null;S.round++;}
+function start(){S.word=pick(CATS[S.cat]);S.out=pick(S.players).id;S.order=shuf(S.players.map(p=>p.id));S.phase='card';S.seen={};S.votes={};S.win=null;S.guessed=null;S.round++;S.note='';}
 function tally(){const c={};Object.values(S.votes).forEach(v=>c[v]=(c[v]||0)+1);const mx=Math.max(...Object.values(c));const top=Object.keys(c).filter(k=>c[k]===mx);
  if(top.length===1&&top[0]===S.out){S.opts=shuf([S.word,...shuf(CATS[S.cat].filter(w=>w!==S.word)).slice(0,5)]);S.phase='guess';}
  else{S.win='out';S.phase='result';}}
 function handle(m,from){
  if(!S)return;const isH=from===S.hostId;
  switch(m.t){
-  case'join':if(S.phase!=='lobby')conns[from]&&conns[from].send({busy:1});
-   else if(!S.players.find(p=>p.id===from)&&S.players.length<12)S.players.push({id:from,name:String(m.name||'لاعب').slice(0,14)});break;
+  case'join':if(S.players.find(p=>p.id===from))break;
+   if(S.phase!=='lobby')conns[from]&&conns[from].send({busy:1});
+   else if(S.players.length>=12)conns[from]&&conns[from].send({busy:2});
+   else S.players.push({id:from,name:String(m.name||'لاعب').slice(0,14)});break;
   case'cat':if(isH&&S.phase==='lobby'&&CATS[m.cat])S.cat=m.cat;break;
   case'start':if(isH&&S.phase==='lobby'&&S.players.length>=3)start();break;
   case'seen':if(S.phase==='card'){S.seen[from]=1;if(S.players.every(p=>S.seen[p.id]))S.phase='ask';}break;
   case'ask2vote':if(isH&&S.phase==='ask'){S.phase='vote';S.votes={};}break;
   case'vote':if(S.phase==='vote'&&S.votes[from]==null&&m.to!==from&&S.players.find(p=>p.id===m.to)){S.votes[from]=m.to;if(S.players.every(p=>S.votes[p.id]!=null))tally();}break;
   case'guess':if(S.phase==='guess'&&from===S.out){S.win=m.w===S.word?'out':'in';S.guessed=m.w;S.phase='result';}break;
-  case'again':if(isH&&S.phase==='result')S.phase='lobby';break;
+  case'again':if(isH)S.phase='lobby';break;
  }
  sync();
 }
@@ -89,29 +91,34 @@ function lview(){
  return S.hostId;}
 
 /* ---------- online (PeerJS, no server needed) ---------- */
-const PC={config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:global.stun.twilio.com:3478'},{urls:['turn:openrelay.metered.ca:80','turn:openrelay.metered.ca:443','turn:openrelay.metered.ca:443?transport=tcp'],username:'openrelayproject',credential:'openrelayproject'}]}};
+const TURN=[];/* لو احتجت سيرفر TURN خاص: {urls:'turn:host:443',username:'..',credential:'..'} */
+const PC=TURN.length?{config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},...TURN]}}:{};
+const noLib=()=>{if(typeof Peer!=='undefined')return false;err='تعذر تحميل مكتبة الاتصال، تأكد من الإنترنت وحدّث الصفحة';render();return true;};
 const gen=()=>Array.from({length:5},()=>pick([...'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'])).join('');
-function reset(){try{peer&&peer.destroy()}catch(e){}peer=null;gconn=null;conns={};S=null;V=null;mode=null;host=false;scr='home';render();}
+function reset(){if(host)code='';try{peer&&peer.destroy()}catch(e){}peer=null;gconn=null;conns={};S=null;V=null;mode=null;host=false;scr='home';render();}
 function create(){
- name=$('#nm').value.trim()||'المضيف';code=gen();mode='online';host=true;
+ if(noLib())return;name=$('#nm').value.trim()||'المضيف';code=gen();mode='online';host=true;
  peer=new Peer('bara-salfa-'+code,PC);
  peer.on('open',()=>{meId='host';S={hostId:'host',players:[{id:'host',name}],cat:'أكلات',phase:'lobby',round:0};scr='game';render();});
  peer.on('connection',c=>{conns[c.peer]=c;
   c.on('data',m=>handle(m,c.peer));
-  c.on('close',()=>{if(S&&S.phase==='lobby'){S.players=S.players.filter(p=>p.id!==c.peer);sync();}});});
- peer.on('error',()=>{err='تعذر إنشاء الغرفة، جرب مرة ثانية';reset();});
+  c.on('close',()=>{const q=S&&S.players.find(p=>p.id===c.peer);if(!q)return;
+   S.players=S.players.filter(p=>p.id!==c.peer);delete conns[c.peer];
+   if(S.phase!=='lobby'){S.phase='lobby';S.note='انسحب '+q.name+'، رجعنا للغرفة';}sync();});});
+ peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
+ peer.on('error',e=>{err='تعذر إنشاء الغرفة ('+e.type+')، جرب مرة ثانية';reset();});
 }
 function join(){
- name=$('#nm').value.trim();code=$('#cd').value.trim().toUpperCase();
+ if(noLib())return;name=$('#nm').value.trim();code=$('#cd').value.replace(/\s/g,'').toUpperCase();
  if(!name||code.length<4){err='اكتب اسمك وكود الغرفة';render();return;}
  mode='online';host=false;peer=new Peer(undefined,PC);
  const fail=m=>{if(!V){err=m;reset();}};
  peer.on('open',id=>{meId=id;gconn=peer.connect('bara-salfa-'+code,{reliable:true});
   gconn.on('open',()=>gconn.send({t:'join',name}));
-  gconn.on('data',d=>{if(d.busy){err='اللعبة شغالة، انتظر الجولة الجديدة';reset();return;}V=d;scr='game';render();});
+  gconn.on('data',d=>{if(d.busy){err=d.busy===2?'الغرفة ممتلئة (١٢ لاعب)':'اللعبة شغالة، انتظر الجولة الجديدة';reset();return;}V=d;scr='game';render();});
   gconn.on('close',()=>{err='انقطع الاتصال بالغرفة';reset();});
-  setTimeout(()=>fail('ما لقينا الغرفة، تأكد من الكود'),9000);});
- peer.on('error',()=>fail('ما لقينا الغرفة، تأكد من الكود'));
+  setTimeout(()=>fail('انتهت المهلة بدون اتصال (timeout)'),15000);});
+ peer.on('error',e=>fail('ما لقينا الغرفة ('+e.type+')، تأكد من الكود'));
 }
 
 /* ---------- screens ---------- */
@@ -120,7 +127,7 @@ const homeH=()=>`<div><h1>برا السالفة</h1><p class=m>الكل يعرف
 ${err?`<p style="color:var(--hot)">${err}</p>`:''}
 <input class=i id=nm placeholder="اسمك" maxlength=14 value="${esc(name)}">
 <button class=b data-a=create>أنشئ غرفة أونلاين</button>
-<div style="display:flex;gap:8px"><input class=i id=cd placeholder="كود الغرفة" maxlength=5 style="direction:ltr;text-transform:uppercase"><button class="b alt" style="width:auto" data-a=join>انضم</button></div>
+<div style="display:flex;gap:8px"><input class=i id=cd placeholder="كود الغرفة" maxlength=5 value="${esc(code||location.hash.slice(1).toUpperCase().slice(0,5))}" style="direction:ltr;text-transform:uppercase"><button class="b alt" style="width:auto" data-a=join>انضم</button></div>
 <button class="b alt" data-a=local>نلعب على جوال واحد</button>`;
 const localH=()=>`<h2>مين اللاعبين؟</h2><p class=m>ثلاثة لاعبين على الأقل</p>${err?`<p style="color:var(--hot)">${err}</p>`:''}
 ${ln.map((n,i)=>`<input class=i data-i=${i} placeholder="لاعب ${i+1}" maxlength=14 value="${esc(n)}">`).join('')}
@@ -132,7 +139,7 @@ function gameH(){
  const nm=id=>esc((s.players.find(p=>p.id===id)||{}).name||'؟');
  if(s.round!==lastRound){revealed=false;ready=false;lastRound=s.round;}
  const gate=l=>`<div class=mid><p class=m>${l}</p><h2>${nm(me)}</h2><button class=b data-a=ready>أنا ${nm(me)}</button></div>`;
- if(s.phase==='lobby')return`<h2>الغرفة</h2>${loc?'':`<div class=code>${esc(code)}</div><p class=m>شارك الكود مع أصحابك عشان ينضمون</p>`}
+ if(s.phase==='lobby')return`<h2>الغرفة</h2>${s.note?`<p style="color:var(--hot)">${esc(s.note)}</p>`:''}${loc?'':`<div class=code>${esc(code)}</div><button class="b alt" data-a=share>شارك رابط الدعوة</button>`}
  <div class=row>${s.players.map(p=>`<span class=chip>${esc(p.name)}</span>`).join('')}</div>
  <p class=m>الفئة</p><div class=row>${Object.keys(CATS).map(c=>`<button class="chip ${c===s.cat?'on':''}" ${isH?`data-a=cat data-v="${c}"`:'disabled'}>${c}</button>`).join('')}</div>
  ${isH?`<button class=b data-a=start ${n<3?'disabled':''}>${n<3?'نحتاج ٣ لاعبين على الأقل':'ابدأ الجولة'}</button>`:'<p class=m>ننتظر المضيف يبدأ…</p>'}`;
@@ -151,7 +158,7 @@ function gameH(){
  if(s.phase==='vote'){
   if(s.votes[me]!=null)return wait(`ننتظر البقية (${Object.keys(s.votes).length}/${n})`);
   if(loc&&!ready)return gate('مرر الجوال لـ');
-  return`<h2>مين برا السالفة؟</h2>${s.players.filter(p=>p.id!==me).map(p=>`<button class="b alt" data-a=vote data-v="${p.id}">${esc(p.name)}</button>`).join('')}`;}
+  return`<h2>مين برا السالفة؟</h2>${s.players.filter(p=>p.id!==me).map(p=>`<button class="b alt" data-a=vote data-v="${esc(p.id)}">${esc(p.name)}</button>`).join('')}`;}
  if(s.phase==='guess'){
   if(me!==s.out)return wait(`انكشف ${nm(s.out)}، بس عنده فرصة أخيرة يخمّن الكلمة…`);
   if(loc&&!ready)return gate('مرر الجوال لـ');
@@ -170,7 +177,9 @@ function render(){
   if(mode==='local'){meId=lview();V=pub(meId);}
   else if(host)V=pub(meId);
   if(!V)return;
-  app.innerHTML=gameH()+`<button class="b alt" style="font-size:14px;padding:8px;margin-top:auto" onclick="location.reload()">خروج</button>`;
+  const endB=mode==='online'&&host&&!['lobby','result'].includes(V.S.phase)?`<button class="b alt" data-a=again>إنهاء الجولة</button>`:'';
+  app.innerHTML=gameH()+`<div style="margin-top:auto;display:grid;gap:8px">${endB}<button class="b alt" style="font-size:14px;padding:8px" onclick="location.reload()">خروج</button></div>`;
+  wake();
  }
  err='';
 }
@@ -193,10 +202,17 @@ const A={
  ask2vote:()=>send({t:'ask2vote'}),
  vote(v){ready=false;send({t:'vote',to:v});},
  guess(v){ready=false;send({t:'guess',w:v});},
- again:()=>send({t:'again'})
+ again:()=>send({t:'again'}),
+ async share(){const url=location.href.split('#')[0]+'#'+code,t='تعال نلعب برا السالفة! كود الغرفة: '+code;
+  try{if(navigator.share)await navigator.share({text:t,url});else{await navigator.clipboard.writeText(t+'\n'+url);alert('اننسخ الرابط');}}catch(e){}}
 };
 app.onclick=e=>{const b=e.target.closest('[data-a]');if(b&&!b.disabled&&A[b.dataset.a])A[b.dataset.a](b.dataset.v);};
 app.oninput=e=>{if(e.target.dataset.i!=null)ln[e.target.dataset.i]=e.target.value;};
+let wl=null;
+async function wake(){try{if(navigator.wakeLock&&!document.hidden&&(!wl||wl.released))wl=await navigator.wakeLock.request('screen');}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)return;
+ if(host&&peer&&peer.disconnected&&!peer.destroyed){try{peer.reconnect()}catch(e){}}
+ if(scr==='game')wake();});
 render();
 </script>
 </body>
