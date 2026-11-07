@@ -97,7 +97,7 @@ const noLib=()=>{if(typeof Peer!=='undefined')return false;err='تعذر تحم�
 const gen=()=>Array.from({length:5},()=>pick([...'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'])).join('');
 function reset(){if(host)code='';try{peer&&peer.destroy()}catch(e){}peer=null;gconn=null;conns={};S=null;V=null;mode=null;host=false;scr='home';render();}
 function create(){
- if(noLib())return;name=$('#nm').value.trim()||'المضيف';code=gen();mode='online';host=true;
+ if(peer||noLib())return;name=$('#nm').value.trim()||'المضيف';code=gen();mode='online';host=true;
  peer=new Peer('bara-salfa-'+code,PC);
  peer.on('open',()=>{meId='host';S={hostId:'host',players:[{id:'host',name}],cat:'أكلات',phase:'lobby',round:0};scr='game';render();});
  peer.on('connection',c=>{conns[c.peer]=c;
@@ -109,7 +109,7 @@ function create(){
  peer.on('error',e=>{err='تعذر إنشاء الغرفة ('+e.type+')، جرب مرة ثانية';reset();});
 }
 function join(){
- if(noLib())return;name=$('#nm').value.trim();code=$('#cd').value.replace(/\s/g,'').toUpperCase();
+ if(peer||noLib())return;name=$('#nm').value.trim();code=$('#cd').value.replace(/\s/g,'').toUpperCase();
  if(!name||code.length<4){err='اكتب اسمك وكود الغرفة';render();return;}
  mode='online';host=false;peer=new Peer(undefined,PC);
  const fail=m=>{if(!V){err=m;reset();}};
