@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>برا السالفة</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Readex+Pro:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#160F2B;--card:#241A45;--line:#3a2d68;--ink:#F4EEFF;--mut:#9A8FC2;--hot:#FF5C8A;--mint:#6EF2C0}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font:400 17px/1.6 'Readex Pro',system-ui,sans-serif;min-height:100dvh;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{max-width:480px;margin:auto;padding:22px 18px 30px;display:flex;flex-direction:column;gap:14px;min-height:100dvh}
+h1,h2{font-family:Lalezar,'Readex Pro',sans-serif;font-weight:400;line-height:1.15}
+h1{font-size:68px;color:var(--hot)}
+h2{font-size:34px}
+.m{color:var(--mut);font-size:15px}
+.b{font:inherit;font-weight:600;font-size:18px;border:0;border-radius:14px;padding:14px 18px;background:var(--mint);color:#10241d;cursor:pointer;width:100%}
+.b.alt{background:var(--card);color:var(--ink);border:1.5px solid var(--line)}
+.b:disabled,.chip:disabled{opacity:.45;cursor:default}
+.i{width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
+.row{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-size:15px;padding:8px 14px;border-radius:99px;background:var(--card);border:1.5px solid var(--line);color:var(--ink)}
+button.chip{cursor:pointer}
+.chip.on{background:var(--hot);border-color:var(--hot);color:#fff}
+.code{font:400 54px/1 Lalezar;letter-spacing:.15em;color:var(--mint);text-align:center;background:var(--card);border-radius:18px;padding:16px;direction:ltr}
+.role{border-radius:26px;min-height:46vh;display:grid;place-items:center;text-align:center;padding:24px;background:var(--card);border:2px dashed #4a3b85;cursor:pointer}
+.role.in{background:var(--mint);color:#10241d;border:0;animation:fl .45s}
+.role.out{background:var(--hot);color:#fff;border:0;animation:fl .45s}
+.big{font:400 56px/1.1 Lalezar,sans-serif}
+.mid{margin:auto;text-align:center;display:grid;gap:14px}
+.pl{display:flex;justify-content:space-between;background:var(--card);padding:10px 14px;border-radius:12px}
+@keyframes fl{from{transform:scaleX(.05)}}
+@media(prefers-reduced-motion:reduce){.role{animation:none!important}}
+:focus-visible{outline:3px solid var(--mint);outline-offset:2px}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const $=s=>document.querySelector(s),app=$('#app');
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pick=a=>a[Math.random()*a.length|0],shuf=a=>a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(x=>x[1]);
+const C=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[k,v.split('،')]));
+const CATS=C({
+'أكلات':'كبسة،شاورما،برجر،بيتزا،مندي،مطبق،سمبوسة،هريس،جريش،مقلقل،فلافل،كنافة،لقيمات،مضغوط،سوشي،كباب',
+'مدن':'الرياض،جدة،مكة،المدينة،الدمام،أبها،الدوحة،دبي،الكويت،القاهرة،بيروت،عمّان،إسطنبول،باريس،لندن،طوكيو',
+'حيوانات':'جمل،صقر،حصان،أسد،نمر،قطة،بطريق،زرافة،دلفين،ذئب،غزال،ثعلب،فيل،قرد،نعامة،أرنب',
+'مشاهير':'رونالدو،ميسي،نيمار،محمد صلاح،مايكل جاكسون،أم كلثوم،محمد عبده،راشد الماجد،إيلون ماسك،شاكيرا،بيل غيتس،بنزيما،ليبرون جيمس،مستر بيست',
+'ألعاب':'ماين كرافت،فورتنايت،ببجي،روبلوكس،فيفا،جي تي أي،أمونغ أس،كول أوف ديوتي،ماريو،زيلدا،فالورانت،كلاش رويال،بلاي ستيشن،ليغ أوف ليجندز',
+'أنمي':'ناروتو،ون بيس،دراغون بول،ديث نوت،هجوم العمالقة،بليتش،كابتن ماجد،المحقق كونان،ساسكي،لوفي،غوكو،ليفاي،زورو،بوكيمون',
+'أماكن':'مطار،مستشفى،مدرسة،مول،مطعم،شاطئ،صحراء،ملعب،مسجد،سينما،محطة بنزين،مخيم،حديقة،فندق،مكتبة،بقالة',
+'أغراض':'ثلاجة،سيارة،جوال،مكيف،كرسي،مفتاح،نظارة،ساعة،شنطة،مظلة،مرآة،دلة قهوة،تلفزيون،سرير،مروحة،سماعة'
+});
+let scr='home',mode=null,host=false,meId=null,peer=null,gconn=null,conns={},S=null,V=null,name='',code='',err='',ln=['','',''],revealed=false,ready=false,lastRound=-1;
+
+/* ---------- game logic (runs on the host / single phone) ---------- */
+function pub(id){const s={...S};if(s.phase!=='result')delete s.word;if(!['result','guess'].includes(s.phase))delete s.out;
+ return{S:s,card:s.phase==='lobby'?null:(S.out===id?{out:1}:{word:S.word})};}
+function start(){S.word=pick(CATS[S.cat]);S.out=pick(S.players).id;S.order=shuf(S.players.map(p=>p.id));S.phase='card';S.seen={};S.votes={};S.win=null;S.guessed=null;S.round++;}
+function tally(){const c={};Object.values(S.votes).forEach(v=>c[v]=(c[v]||0)+1);const mx=Math.max(...Object.values(c));const top=Object.keys(c).filter(k=>c[k]===mx);
+ if(top.length===1&&top[0]===S.out){S.opts=shuf([S.word,...shuf(CATS[S.cat].filter(w=>w!==S.word)).slice(0,5)]);S.phase='guess';}
+ else{S.win='out';S.phase='result';}}
+function handle(m,from){
+ if(!S)return;const isH=from===S.hostId;
+ switch(m.t){
+  case'join':if(S.phase!=='lobby')conns[from]&&conns[from].send({busy:1});
+   else if(!S.players.find(p=>p.id===from)&&S.players.length<12)S.players.push({id:from,name:String(m.name||'لاعب').slice(0,14)});break;
+  case'cat':if(isH&&S.phase==='lobby'&&CATS[m.cat])S.cat=m.cat;break;
+  case'start':if(isH&&S.phase==='lobby'&&S.players.length>=3)start();break;
+  case'seen':if(S.phase==='card'){S.seen[from]=1;if(S.players.every(p=>S.seen[p.id]))S.phase='ask';}break;
+  case'ask2vote':if(isH&&S.phase==='ask'){S.phase='vote';S.votes={};}break;
+  case'vote':if(S.phase==='vote'&&S.votes[from]==null&&m.to!==from&&S.players.find(p=>p.id===m.to)){S.votes[from]=m.to;if(S.players.every(p=>S.votes[p.id]!=null))tally();}break;
+  case'guess':if(S.phase==='guess'&&from===S.out){S.win=m.w===S.word?'out':'in';S.guessed=m.w;S.phase='result';}break;
+  case'again':if(isH&&S.phase==='result')S.phase='lobby';break;
+ }
+ sync();
+}
+function sync(){
+ if(mode==='online')S.players.forEach(p=>{const c=conns[p.id];if(p.id!==S.hostId&&c&&c.open)c.send(pub(p.id));});
+ render();
+}
+function send(m){if(mode==='online'&&!host)gconn.send(m);else handle(m,meId);}
+function lview(){
+ if(S.phase==='card')return(S.players.find(p=>!S.seen[p.id])||{}).id;
+ if(S.phase==='vote')return(S.players.find(p=>S.votes[p.id]==null)||{}).id;
+ if(S.phase==='guess')return S.out;
+ return S.hostId;}
+
+/* ---------- online (PeerJS, no server needed) ---------- */
+const gen=()=>Array.from({length:5},()=>pick([...'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'])).join('');
+function reset(){try{peer&&peer.destroy()}catch(e){}peer=null;gconn=null;conns={};S=null;V=null;mode=null;host=false;scr='home';render();}
+function create(){
+ name=$('#nm').value.trim()||'المضيف';code=gen();mode='online';host=true;
+ peer=new Peer('bara-salfa-'+code);
+ peer.on('open',()=>{meId='host';S={hostId:'host',players:[{id:'host',name}],cat:'أكلات',phase:'lobby',round:0};scr='game';render();});
+ peer.on('connection',c=>{conns[c.peer]=c;
+  c.on('data',m=>handle(m,c.peer));
+  c.on('close',()=>{if(S&&S.phase==='lobby'){S.players=S.players.filter(p=>p.id!==c.peer);sync();}});});
+ peer.on('error',()=>{err='تعذر إنشاء الغرفة، جرب مرة ثانية';reset();});
+}
+function join(){
+ name=$('#nm').value.trim();code=$('#cd').value.trim().toUpperCase();
+ if(!name||code.length<4){err='اكتب اسمك وكود الغرفة';render();return;}
+ mode='online';host=false;peer=new Peer();
+ const fail=m=>{if(!V){err=m;reset();}};
+ peer.on('open',id=>{meId=id;gconn=peer.connect('bara-salfa-'+code,{reliable:true});
+  gconn.on('open',()=>gconn.send({t:'join',name}));
+  gconn.on('data',d=>{if(d.busy){err='اللعبة شغالة، انتظر الجولة الجديدة';reset();return;}V=d;scr='game';render();});
+  gconn.on('close',()=>{err='انقطع الاتصال بالغرفة';reset();});
+  setTimeout(()=>fail('ما لقينا الغرفة، تأكد من الكود'),9000);});
+ peer.on('error',()=>fail('ما لقينا الغرفة، تأكد من الكود'));
+}
+
+/* ---------- screens ---------- */
+const wait=t=>`<div class=mid><p class=m>${t}</p></div>`;
+const homeH=()=>`<div><h1>برا السالفة</h1><p class=m>الكل يعرف السالفة إلا واحد. اكتشفه قبل لا يكتشفكم.</p></div>
+${err?`<p style="color:var(--hot)">${err}</p>`:''}
+<input class=i id=nm placeholder="اسمك" maxlength=14 value="${esc(name)}">
+<button class=b data-a=create>أنشئ غرفة أونلاين</button>
+<div style="display:flex;gap:8px"><input class=i id=cd placeholder="كود الغرفة" maxlength=5 style="direction:ltr;text-transform:uppercase"><button class="b alt" style="width:auto" data-a=join>انضم</button></div>
+<button class="b alt" data-a=local>نلعب على جوال واحد</button>`;
+const localH=()=>`<h2>مين اللاعبين؟</h2><p class=m>ثلاثة لاعبين على الأقل</p>${err?`<p style="color:var(--hot)">${err}</p>`:''}
+${ln.map((n,i)=>`<input class=i data-i=${i} placeholder="لاعب ${i+1}" maxlength=14 value="${esc(n)}">`).join('')}
+<button class="b alt" data-a=addp ${ln.length>=12?'disabled':''}>إضافة لاعب</button>
+<button class=b data-a=startlocal>كمّلنا</button><button class="b alt" data-a=back>رجوع</button>`;
+
+function gameH(){
+ const{S:s,card}=V,me=meId,n=s.players.length,loc=mode==='local',isH=me===s.hostId;
+ const nm=id=>esc((s.players.find(p=>p.id===id)||{}).name||'؟');
+ if(s.round!==lastRound){revealed=false;ready=false;lastRound=s.round;}
+ const gate=l=>`<div class=mid><p class=m>${l}</p><h2>${nm(me)}</h2><button class=b data-a=ready>أنا ${nm(me)}</button></div>`;
+ if(s.phase==='lobby')return`<h2>الغرفة</h2>${loc?'':`<div class=code>${esc(code)}</div><p class=m>شارك الكود مع أصحابك عشان ينضمون</p>`}
+ <div class=row>${s.players.map(p=>`<span class=chip>${esc(p.name)}</span>`).join('')}</div>
+ <p class=m>الفئة</p><div class=row>${Object.keys(CATS).map(c=>`<button class="chip ${c===s.cat?'on':''}" ${isH?`data-a=cat data-v="${c}"`:'disabled'}>${c}</button>`).join('')}</div>
+ ${isH?`<button class=b data-a=start ${n<3?'disabled':''}>${n<3?'نحتاج ٣ لاعبين على الأقل':'ابدأ الجولة'}</button>`:'<p class=m>ننتظر المضيف يبدأ…</p>'}`;
+ if(s.phase==='card'){
+  if(s.seen[me])return wait(`ننتظر البقية (${Object.keys(s.seen).length}/${n})`);
+  if(loc&&!ready)return gate('مرر الجوال لـ');
+  return`<p class=m>هذا دورك تشوف السالفة. لا أحد يشوف جوالك.</p>
+  <div class="role ${revealed?(card.out?'out':'in'):''}" data-a=reveal>${revealed
+   ?(card.out?`<div><div class=big>برا السالفة</div><p>ما تعرف الكلمة. استمع للأجوبة وتظاهر إنك تعرفها.</p></div>`
+              :`<div><p>${s.cat}</p><div class=big>${esc(card.word)}</div></div>`)
+   :`<div><div class=big>؟</div><p class=m>اضغط عشان تشوف دورك</p></div>`}</div>
+  ${revealed?`<button class=b data-a=seen>فهمت، أخفِ</button>`:''}`;}
+ if(s.phase==='ask')return`<h2>الأسئلة</h2><p class=m>كل واحد يسأل اللي بعده سؤال عن السالفة بدون ما يقولها صريحة، والكل يجاوب.</p>
+  <ol style="padding-inline-start:22px;display:grid;gap:8px">${s.order.map((id,i)=>`<li>${nm(id)} يسأل ${nm(s.order[(i+1)%n])}</li>`).join('')}</ol>
+  ${isH?`<button class=b data-a=ask2vote>خلصنا، نصوّت</button>`:'<p class=m>المضيف يبدأ التصويت…</p>'}`;
+ if(s.phase==='vote'){
+  if(s.votes[me]!=null)return wait(`ننتظر البقية (${Object.keys(s.votes).length}/${n})`);
+  if(loc&&!ready)return gate('مرر الجوال لـ');
+  return`<h2>مين برا السالفة؟</h2>${s.players.filter(p=>p.id!==me).map(p=>`<button class="b alt" data-a=vote data-v="${p.id}">${esc(p.name)}</button>`).join('')}`;}
+ if(s.phase==='guess'){
+  if(me!==s.out)return wait(`انكشف ${nm(s.out)}، بس عنده فرصة أخيرة يخمّن الكلمة…`);
+  if(loc&&!ready)return gate('مرر الجوال لـ');
+  return`<h2>انكشفت!</h2><p class=m>خمّن الكلمة وتفوز.</p>${s.opts.map(w=>`<button class="b alt" data-a=guess data-v="${esc(w)}">${esc(w)}</button>`).join('')}`;}
+ const cnt={};Object.values(s.votes).forEach(v=>cnt[v]=(cnt[v]||0)+1);const w=s.win==='out';
+ return`<h2 style="color:${w?'var(--hot)':'var(--mint)'}">${w?'فاز اللي برا السالفة':'فازوا اللي داخل السالفة'}</h2>
+ <p>اللي برا السالفة: <b>${nm(s.out)}</b><br>الكلمة: <b>${esc(s.word)}</b>${s.guessed?`<br>خمّن: ${esc(s.guessed)}`:(w?'<br>ما انكشف، الأصوات راحت لغيره.':'')}</p>
+ <div style="display:grid;gap:6px">${s.players.map(p=>`<div class=pl><span>${esc(p.name)}${p.id===s.out?' (برا السالفة)':''}</span><span class=m>${cnt[p.id]||0} أصوات</span></div>`).join('')}</div>
+ ${isH?`<button class=b data-a=again>جولة جديدة</button>`:'<p class=m>ننتظر المضيف…</p>'}`;
+}
+
+function render(){
+ if(scr==='home')app.innerHTML=homeH();
+ else if(scr==='local')app.innerHTML=localH();
+ else{
+  if(mode==='local'){meId=lview();V=pub(meId);}
+  else if(host)V=pub(meId);
+  if(!V)return;
+  app.innerHTML=gameH()+`<button class="b alt" style="font-size:14px;padding:8px;margin-top:auto" onclick="location.reload()">خروج</button>`;
+ }
+ err='';
+}
+
+/* ---------- events ---------- */
+const A={
+ create,join,
+ local(){name=$('#nm').value;scr='local';render();},
+ back(){scr='home';render();},
+ addp(){ln.push('');render();},
+ startlocal(){
+  const names=ln.map(x=>x.trim()).filter(Boolean);
+  if(names.length<3){err='لازم ثلاثة أسماء على الأقل';render();return;}
+  mode='local';S={hostId:'p0',players:names.map((x,i)=>({id:'p'+i,name:x})),cat:'أكلات',phase:'lobby',round:0};scr='game';render();},
+ cat:v=>send({t:'cat',cat:v}),
+ start:()=>send({t:'start'}),
+ reveal(){revealed=true;render();},
+ ready(){ready=true;render();},
+ seen(){revealed=false;ready=false;send({t:'seen'});},
+ ask2vote:()=>send({t:'ask2vote'}),
+ vote(v){ready=false;send({t:'vote',to:v});},
+ guess(v){ready=false;send({t:'guess',w:v});},
+ again:()=>send({t:'again'})
+};
+app.onclick=e=>{const b=e.target.closest('[data-a]');if(b&&!b.disabled&&A[b.dataset.a])A[b.dataset.a](b.dataset.v);};
+app.oninput=e=>{if(e.target.dataset.i!=null)ln[e.target.dataset.i]=e.target.value;};
+render();
+</script>
+</body>
+</html>
